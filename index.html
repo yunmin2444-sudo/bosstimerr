@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Boss Timer (Supabase Ready)</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#0b0b0b;
+  color:white;
+}
+
+.container{
+  display:flex;
+  height:100vh;
+}
+
+.left{
+  width:35%;
+  background:#111;
+  padding:10px;
+  border-right:1px solid #222;
+  overflow:auto;
+}
+
+.card{
+  background:#1a1a1a;
+  padding:10px;
+  margin:10px 0;
+  border-left:3px solid #00ff99;
+}
+
+button{
+  width:100%;
+  padding:10px;
+  margin:5px 0;
+  background:#222;
+  color:white;
+  border:none;
+  cursor:pointer;
+  border-radius:6px;
+}
+
+button:hover{
+  background:#333;
+}
+
+.timer{
+  font-size:18px;
+  color:#00ff99;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <div class="left">
+    <h3>💀 Shared Boss Timer</h3>
+
+    <div id="list"></div>
+
+    <input id="bossName" placeholder="Boss name"
+      style="width:100%;padding:10px;">
+    <button onclick="addBoss()">+ Add Boss</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+
+/* =========================
+   🔑 1. 여기만 바꾸면 됨
+========================= */
+const supabaseUrl = "https://ecnrxfqcjjgsltkaunbv.supabase.co/rest/v1/";
+const supabaseKey = "sb_publishable_7UlIv49iw_epM1h1JepJuw_GH2gaoBl";
+/* ========================= */
+
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+let bosses = {};
+
+// 📡 불러오기
+async function load(){
+  const { data } = await supabase
+    .from("bosses")
+    .select("*");
+
+  bosses = {};
+  data.forEach(b=>{
+    bosses[b.name] = b;
+  });
+
+  render();
+}
+
+// 🎨 UI
+function render(){
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  Object.keys(bosses).forEach(name=>{
+
+    let b = bosses[name];
+
+    let h = String(Math.floor(b.remaining/3600)).padStart(2,'0');
+    let m = String(Math.floor((b.remaining%3600)/60)).padStart(2,'0');
+    let s = String(b.remaining%60).padStart(2,'0');
+
+    let div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <b>${name}</b><br>
+      <div class="timer">${h}:${m}:${s}</div>
+
+      <button onclick="startBoss('${name}')">▶ Start</button>
+      <button onclick="resetBoss('${name}')">↻ Reset</button>
+    `;
+
+    list.appendChild(div);
+  });
+}
+
+// ➕ 추가
+async function addBoss(){
+
+  let name = document.getElementById("bossName").value;
+  if(!name) return;
+
+  await supabase.from("bosses").insert([{
+    name:name,
+    remaining:18000,
+    running:false
+  }]);
+
+  document.getElementById("bossName").value = "";
+  load();
+}
+
+// ▶ 시작
+async function startBoss(name){
+
+  await supabase
+    .from("bosses")
+    .update({ running:true })
+    .eq("name",name);
+}
+
+// ↻ 리셋
+async function resetBoss(name){
+
+  await supabase
+    .from("bosses")
+    .update({
+      remaining:18000,
+      running:false
+    })
+    .eq("name",name);
+}
+
+// ⏱ 감소 로직 (전체 공유)
+setInterval(async ()=>{
+
+  const { data } = await supabase.from("bosses").select("*");
+
+  for(let b of data){
+
+    if(b.running && b.remaining > 0){
+
+      await supabase
+        .from("bosses")
+        .update({
+          remaining: b.remaining - 1
+        })
+        .eq("name", b.name);
+    }
+  }
+
+},1000);
+
+// 📡 실시간 새로고침
+setInterval(load,2000);
+
+load();
+
+</script>
+
+</body>
+</html>
